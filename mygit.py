@@ -115,6 +115,31 @@ def write_index(filenames):
         f.write(index_header + index_version.to_bytes(4) + entry_num.to_bytes(4) + content)
     return
 
+def update_index(path):
+    abspath = os.path.abspath(path)
+    index_path = repo_find(os.getcwd()) + "/.git/index"
+    if os.path.exists(index_path):
+        with open(index_path, "rb") as f:
+            data = f.read()
+    else:
+        write_index(abspath)
+        return
+    
+    paths = []
+    entry_num = struct.unpack(">i", data[8:12])[0]
+    start = 12
+    for _ in range(entry_num):
+        filename_size = struct.unpack(">h", data[start + 60: start + 62])[0]
+        filename = data[start + 62: start + 62 + filename_size].decode()
+        padding = cal_padding(filename_size)
+        paths.append(filename)
+        start += 62 + filename_size + padding
+    
+    if path not in paths:
+        paths.append(path)
+    paths.sort()
+    write_index(paths)
+
 def write_tree():
     cwd = os.getcwd()
     index_path = repo_find(cwd) + "/.git/index"
