@@ -115,6 +115,40 @@ def write_index(filenames):
         f.write(index_header + index_version.to_bytes(4) + entry_num.to_bytes(4) + content)
     return
 
+def write_tree():
+    cwd = os.getcwd()
+    index_path = repo_find(cwd) + "/.git/index"
+    with open(index_path, "rb") as f:
+        data = f.read()
+    entry_num = struct.unpack(">i", data[8:12])[0]
+    entries = b""
+    start = 12
+    for _ in range(entry_num):
+        mode = struct.unpack(">i", data[start + 24: start + 28])[0]
+        hash = data[start + 40: start + 60]
+        filename_size = struct.unpack(">h", data[start + 60: start + 62])[0]
+        filename = data[start + 62: start + 62 + filename_size]
+        padding = cal_padding(filename_size)
+        
+        entries += format(mode, "06o").encode() +  b" " + filename + b"\0" + hash
+        
+        start += 62 + filename_size + padding
+
+    tree_object = b"tree " + str(len(entries)).encode() + b"\0" + entries
+
+    # Compute hash
+    sha = hashlib.sha1(tree_object).hexdigest()
+
+    object_path = repo_find(cwd) + "/.git/objects/" + sha[0:2] + "/" + sha[2:]
+    dir = os.path.dirname(object_path)
+
+    if not os.path.isdir(dir):
+        os.makedirs(dir)
+    with open(object_path, 'wb') as f:
+        # Compress and write
+        f.write(zlib.compress(tree_object))
+    return sha
+
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers()
 
