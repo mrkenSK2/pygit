@@ -70,7 +70,7 @@ def create_entry(filename):
 
     filename_size = len(filename)
 
-    padding_size = padding(filename_size)
+    padding_size = cal_padding(filename_size)
     padding = b'\0' * padding_size
 
     entry_meta = (
@@ -96,8 +96,24 @@ def create_entry(filename):
 
     return filemeta_data
 
-def padding(size):
-    return (8 - (size % 8)) % 8
+def cal_padding(size):
+    # before filename 62 bytes
+    return 8 - (size + 6) % 8
+
+def write_index(filenames):
+    content = b""
+    index_header = b"DIRC"
+    index_version = 2
+    entry_num = len(filenames)
+
+    for filename in filenames:
+        entry = create_entry(filename)
+        content += entry
+    
+    index_path = repo_find(os.getcwd()) + "/.git/index"
+    with open(index_path, 'wb') as f:
+        f.write(index_header + index_version.to_bytes(4) + entry_num.to_bytes(4) + content)
+    return
 
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers()
