@@ -248,6 +248,26 @@ def cat_commit_tree(commit_hash):
     tree_hash = r_data[tree_start+6 : tree_start + 46]
     return tree_hash
 
+def update_ref(commit_hash):
+    path = os.path.join(os.getcwd(), ".git/HEAD")
+    with open(path, "r+") as f:
+        ref = f.read().strip()
+
+    prefix_path = ref.split(' ')
+
+    if "/" in prefix_path[1]:
+        branch_path = os.path.join(os.getcwd(), ".git", prefix_path[1].replace("\n", ""))
+        with open(branch_path, "w") as f:
+            f.write(commit_hash)
+
+        # 直接ハッシュ値が格納されていたHEADに直接書き込み
+    head_content = "refs: {}".format(commit_hash)
+    f.truncate(0)
+    f.seek(0)
+    f.write(head_content)
+
+    return None
+
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers()
 
