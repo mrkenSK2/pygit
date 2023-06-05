@@ -7,6 +7,7 @@ import hashlib
 import re
 import zlib
 import struct
+import datetime
 import pygit2
 from math import ceil
 
@@ -173,6 +174,79 @@ def write_tree():
         # Compress and write
         f.write(zlib.compress(tree_object))
     return sha
+
+def commit_tree(tree_hash, message):
+    conf_path = os.path.join(repo_find(os.getcwd()), ".git/config") 
+    config = configparser.ConfigParser()
+    config.read(conf_path)
+    _author = config.get("user", "name")
+    email = config.get("user", "email")
+    author = "author {} <{}> {} + 0900".format(_author, email, datetime.datetime.now())
+    committer = "committer " + author[7:]
+    
+    commit_content = b""
+    head_commit = read_head()
+
+    if head_commit is not None:
+        if tree_hash != cat_commit_tree(head_commit):
+            parent = "parent {}".format(head_commit)
+            content = "tree {}\n{}\n{}\n{}\n\n{}\n".format(tree_hash, parent, author, committer, message)
+        else:
+            print("Nothing to commit");
+            return None
+    else:
+        content = "tree {}\n{}\n{}\n\n{}\n".format(tree_hash, author, committer, message)
+    commit_content = b"commit " + str(len(content)).encode() + b"\0" + content.encode()
+
+    # Compress the content
+    compressed = zlib.compress(commit_content)
+
+    # Calculate the hash
+    sha = hashlib.sha1(commit_content).hexdigest()
+    object_path = repo_find(os.getcwd()) + "/.git/objects/" + sha[0:2] + "/" + sha[2:]
+    dir = os.path.dirname(object_path)
+
+    if not os.path.isdir(dir):
+        os.makedirs(dir)
+
+    with open(object_path, "wb") as f:
+        f.write(compressed)
+
+    return sha
+
+def read_head():
+    HEAD_path = os.path.join(repo_find(os.getcwd()), ".git/HEAD")
+    if not os.path.exists(HEAD_path):
+        raise Exception("no HEAD")
+    with open(HEAD_path, "r") as file:
+        ref = file.read().strip()
+    
+    prefix_path = ref.split(" ")
+    
+    # ref is branch
+    if "/" in prefix_path[1]:
+        branch_path = os.path.join(os.getcwd(), ".git", prefix_path[1].replace("\n", ""))
+        if not os.path.exists(branch_path):
+            return None
+        with open(branch_path, "r") as f:
+            hash = f.read().strip()
+            return hash.replace("\n", "")
+    
+    return prefix_path[1].replace("\n", "")
+
+def cat_commit_tree(commit_hash):
+    dir_path = commit_hash[0:2]
+    file_path = commit_hash[2:]
+    object_path = os.path.join(os.getcwd(), ".git/objects", dir_path, file_path)
+
+    if not os.path.exists(object_path):
+        raise Exception("commit doesn't exist")
+    with open(object_path, "rb") as f:
+        data = f.read()
+    r_data = zlib.decompress(data)
+    tree_start = r_data.find(b"\0")
+    tree_hash = r_data[tree_start+6 : tree_start + 46]
+    return tree_hash
 
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers()
