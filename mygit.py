@@ -258,8 +258,31 @@ def update_ref(commit_hash):
 
     return None
 
+def cmd_add(args):
+    if not args.files:
+        parser_add.error('Nothing specified, nothing added.')
+    for filename in args.files:
+        write_blob(filename)
+        update_index(filename)
+    return
+
+def cmd_commit(args):
+    tree_hash = write_tree()
+    hash = commit_tree(tree_hash, args.m)
+    if hash != None:
+        update_ref(hash)
+    return
+
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers()
+
+parser_add = subparsers.add_parser('add', help='Add file contents to the index')
+parser_add.add_argument('files', nargs='*')
+parser_add.set_defaults(handler=cmd_add)
+
+parser_commit = subparsers.add_parser('commit', help='Record changes to the repository')
+parser_commit.add_argument('-m', metavar='msg', required=True, help='commit message')
+parser_commit.set_defaults(handler=cmd_commit)
 
 args = parser.parse_args()
 if hasattr(args, 'handler'):
