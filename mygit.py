@@ -1,15 +1,10 @@
 import os
-import collections
-import sys
 import argparse
 import configparser
 import hashlib
-import re
 import zlib
 import struct
 import datetime
-import pygit2
-from math import ceil
 
 def repo_find(path):
     path = os.path.realpath(path)
@@ -41,12 +36,6 @@ def write_blob(path):
         # Compress and write
         f.write(zlib.compress(result))
     return sha
-
-
-def create_entry(filename):
-    path = os.path.abspath(filename)
-    metadata = os.stat(path)
-
 
 def create_entry(filename):
     path = os.path.abspath(filename)
@@ -117,13 +106,13 @@ def write_index(filenames):
     return
 
 def update_index(path):
-    abspath = os.path.abspath(path)
     index_path = repo_find(os.getcwd()) + "/.git/index"
     if os.path.exists(index_path):
         with open(index_path, "rb") as f:
             data = f.read()
     else:
-        write_index(abspath)
+        path = [path]
+        write_index(path)
         return
     
     paths = []
@@ -192,7 +181,7 @@ def commit_tree(tree_hash, message):
             parent = "parent {}".format(head_commit)
             content = "tree {}\n{}\n{}\n{}\n\n{}\n".format(tree_hash, parent, author, committer, message)
         else:
-            print("Nothing to commit");
+            print("Nothing to commit")
             return None
     else:
         content = "tree {}\n{}\n{}\n\n{}\n".format(tree_hash, author, committer, message)
@@ -245,8 +234,8 @@ def cat_commit_tree(commit_hash):
         data = f.read()
     r_data = zlib.decompress(data)
     tree_start = r_data.find(b"\0")
-    tree_hash = r_data[tree_start+6 : tree_start + 46]
-    return tree_hash
+    tree_hash = r_data[tree_start + 6 : tree_start + 46]
+    return tree_hash.decode()
 
 def update_ref(commit_hash):
     path = os.path.join(os.getcwd(), ".git/HEAD")
@@ -258,13 +247,14 @@ def update_ref(commit_hash):
     if "/" in prefix_path[1]:
         branch_path = os.path.join(os.getcwd(), ".git", prefix_path[1].replace("\n", ""))
         with open(branch_path, "w") as f:
-            f.write(commit_hash)
+            f.write(commit_hash + "\n")
 
-        # 直接ハッシュ値が格納されていたHEADに直接書き込み
-    head_content = "refs: {}".format(commit_hash)
-    f.truncate(0)
-    f.seek(0)
-    f.write(head_content)
+    # 直接ハッシュ値が格納されていたHEADに直接書き込み
+    # head_content = "{}".format(commit_hash)
+    # with open(path, "r+") as f:
+    # f.truncate(0)
+    # f.seek(0)
+    # f.write(head_content + "\n")
 
     return None
 
